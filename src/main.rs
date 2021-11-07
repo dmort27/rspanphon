@@ -2,7 +2,7 @@ use rspanphon::featuretable::FeatureHashes;
 use rspanphon::featuretable::FeatureTable;
 
 fn main() {
-    let ft = FeatureTable::new();
+    // let ft = FeatureTable::new();
     // dbg!(&ft);
     // dbg!(&ft.fnames);
     let fh = FeatureHashes::from_base_and_diacritics("ipa_bases.csv", "diacritic_definitions.yml");
