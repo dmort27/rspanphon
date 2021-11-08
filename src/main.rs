@@ -1,5 +1,5 @@
 use rspanphon::featuretable::FeatureHashes;
-use rspanphon::featuretable::FeatureTable;
+// use rspanphon::featuretable::FeatureTable;
 
 fn main() {
     // let ft = FeatureTable::new();
