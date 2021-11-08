@@ -1,9 +1,9 @@
 [package]
 name = "rspanphon"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2018"
 authors = ["David R. Mortensen <dmortens@cs.cmu.edu>"]
-rust-version = "1.55.0"
+rust-version = "1.53.0"
 description="rsPanPhon, a rough Rust port of the Python PanPhon library, extracts articulatory features from IPA strings and implements operations on them."
 readme="README.md"
 repository="https://github.com/dmort27/rspanphon"
