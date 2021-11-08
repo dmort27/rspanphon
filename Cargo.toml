@@ -9,7 +9,7 @@ readme="README.md"
 repository="https://github.com/dmort27/rspanphon"
 license="MIT"
 license-file="LICENSE"
-keywords=["NLP", "linguistics", "phonology", "phonological", "phoneme", "articulatory", "distance"]
+keywords=["NLP", "linguistics", "phonology", "phoneme", "articulatory"]
 
 [lib]
 name = "rspanphon"
