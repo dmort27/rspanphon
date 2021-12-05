@@ -1,4 +1,6 @@
 pub mod featuretable {
+    //! The `featuretable` module implements loading, extracting, and analyzing
+    //! representations based on phonological (typically articulatory) features.
     use serde::Deserialize;
     use serde_yaml;
     use std::collections::HashMap;
@@ -10,6 +12,11 @@ pub mod featuretable {
     use cached::UnboundCache;
 
 
+    /// The [`FeatureTable`] struct provides a layer of abstraction over `ft`, a
+    /// [`HashMap`] defining the relationship between IPA phonemes and their
+    /// featural eqivalents (expressed as vectors of `i8`s). The `fnames` field
+    /// provides human-interpretable names for each of the dimensions in the
+    /// vectors.
     #[derive(Debug)]
     pub struct FeatureTable {
         pub ft: HashMap<String, Vec<i8>>,
@@ -17,6 +24,10 @@ pub mod featuretable {
     }
 
     impl FeatureTable {
+        /// Constructs a [`FeatureTable`] from a CSV file at `path`. The CSV
+        /// file must have phonemes in the first column and feature
+        /// specifications in each of the additional columns (which each column
+        /// corresponds to a feature).
         pub fn from_csv(path: &str) -> FeatureTable {
             FeatureTable {
                 ft: FeatureTable::read_feature_table(path),
@@ -24,6 +35,8 @@ pub mod featuretable {
             }
         }
 
+        /// Constructs a new [`FeatureTable`] using the default data file that
+        /// is compiled into the binary.
         pub fn new() -> FeatureTable {
             FeatureTable {
                 ft: FeatureTable::default_feature_table(),
@@ -31,6 +44,8 @@ pub mod featuretable {
             }
         }
 
+        /// Reads a feature table, as a [`HashMap`] from `String`s to `Vec`s,
+        /// from a CSV file at a path.
         fn read_feature_table(path: &str) -> HashMap<String, Vec<i8>> {
             let path = Path::new(path);
             let display = path.display();
@@ -55,6 +70,8 @@ pub mod featuretable {
             return table;
         }
 
+        /// Reads the names of the features from a CSV file. It is assumed that
+        /// they are in the header row in the non-initial columns. 
         fn read_feature_names(path: &str) -> Vec<String> {
             let path = Path::new(path);
             let display = path.display();
@@ -74,6 +91,7 @@ pub mod featuretable {
             fnames
         }
 
+        /// Reads the default feature table from the file `ipa_all.csv`.
         fn default_feature_table() -> HashMap<String, Vec<i8>> {
             let tab = include_str!("../ipa_all.csv");
             let mut rdr = csv::Reader::from_reader(tab.as_bytes());
@@ -93,6 +111,7 @@ pub mod featuretable {
             return table;
         }
 
+        /// Reads the feature names from the default file `ipa_all.csv`.
         fn default_feature_names() -> Vec<String> {
             let tab = include_str!("../ipa_all.csv");
             let mut rdr = csv::ReaderBuilder::new()
@@ -114,29 +133,39 @@ pub mod featuretable {
             return fnames;
         }
 
+        /// Returns the feature names associated with a [`FeatureTable`] object.
         pub fn to_fnames(&self) -> Vec<String> {
             return self.fnames.clone();
         }
 
+        /// Parses an IPA `&str` into individual phonemes, based on the feature
+        /// table.
+        /// 
+        /// # Example
+        /// 
+        /// ```rust
+        /// # use rspanphon::featuretable::*;
+        /// let ft = FeatureTable::new();
+        /// assert_eq!(vec!["pʰ".to_string(), "i".to_string()], ft.phonemes("pʰi"));
+        /// ```
         pub fn phonemes(&self, s: &str) -> Vec<String> {
             let ft = &self.ft;
             let mut v: Vec<String> = Vec::new();
             let mut acc: String = String::from("");
             for c in s.chars() {
                 acc.push(c);
-                let valid = match ft.get(&acc) {
-                    Some(_) => true,
-                    None => false,
-                };
-                if !valid {
-                    let n = acc.pop();
-                    let popped = match n {
-                        Some(_) => true,
-                        None => false,
-                    };
-                    if popped {
-                        v.push(acc);
-                        acc = c.to_string();
+                if c != '͡' {
+                    match ft.get(&acc) {
+                        Some(_) => {},
+                        None => {
+                            match acc.pop() {
+                                Some(_) => {
+                                    v.push(acc);
+                                    acc = c.to_string();
+                                },
+                                None => {},
+                            }
+                        }
                     }
                 }
             }
@@ -144,6 +173,16 @@ pub mod featuretable {
             return v;
         }
 
+        /// Takes a vector of phonemes and returns a vector of feature vectors.
+        /// 
+        /// # Example
+        /// 
+        /// ```rust
+        /// # use rspanphon::featuretable::*;
+        /// let ft = FeatureTable::new();
+        /// let phonemes = ft.phonemes("kʰul");
+        /// assert_eq(3, ft.phonemes_to_vectors(phonemes).len());
+        /// ```
         pub fn phonemes_to_vectors(&self, ps: &Vec<String>) -> Vec<Vec<i8>> {
             let mut vs: Vec<Vec<i8>> = Vec::new();
             for p in ps.iter() {
@@ -155,6 +194,12 @@ pub mod featuretable {
             return vs;
         }
 
+        /// Computes the unweighted feature distance between two vectors. This
+        /// runs in worst case O(l * m * n) time (where l is the length of the
+        /// feature vectors and m and n are the lengths of the input vectors).
+        /// However, the results from the functions that calculate deletion,
+        /// insertion, and substitution cost are memoized so that the best case
+        /// run time is close to O(m * n).
         pub fn fd(s: &Vec<Vec<i8>>, t: &Vec<Vec<i8>>) -> f64 {
             let n = s.len();
             let m = t.len();
@@ -184,6 +229,8 @@ pub mod featuretable {
             dp[n][m]
         }
 
+        /// This function wraps [`FeatureTable::fd`], accepting `&str`s directly
+        /// instead of vectors of feature vectors. 
         pub fn feature_edit_distance(&self, s1: &str, s2: &str) -> f64 {
             let ps1 = &self.phonemes(s1);
             let ps2 = &self.phonemes(s2);
@@ -413,5 +460,15 @@ pub mod featuretable {
             _ => 0.0,
         };
         return d;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::featuretable::*;
+    #[test]
+    fn ligature_ties() {
+        let ft = FeatureTable::new();
+        assert_eq!(vec!["t͡s".to_string(), "a".to_string()], ft.phonemes("t͡sa"));
     }
 }
