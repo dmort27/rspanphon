@@ -229,7 +229,7 @@ pub mod featuretable {
             dp[n][m]
         }
 
-        /// This function wraps [`FeatureTable::fd`], accepting `&str`s directly
+        /// Wraps [`FeatureTable::fd`], accepting `&str`s directly
         /// instead of vectors of feature vectors. 
         pub fn feature_edit_distance(&self, s1: &str, s2: &str) -> f64 {
             let ps1 = &self.phonemes(s1);
@@ -239,6 +239,7 @@ pub mod featuretable {
             FeatureTable::fd(v1, v2)
         }
 
+        /// Returns a [`FeatureHashes`] struct equivalent to the [`FeatureTable`] struct.
         pub fn to_feature_hashes(&self) -> FeatureHashes {
             let mut fh = FeatureHashes::new();
             fh.fnames = self.fnames.clone();
@@ -283,6 +284,7 @@ pub mod featuretable {
     }
 
     impl Diacritic {
+        /// Apply diacritic to base.
         pub fn affix(&self, base: &str) -> String {
             match &self.position {
                 DiaPos::Prefix => format!("{}{}", self.marker, base),
@@ -290,6 +292,7 @@ pub mod featuretable {
             }
         }
 
+        /// Update the feature map of the [`Diacritic`] struct based on `map`.
         pub fn update_ft_map(&self, map: &HashMap<String, i8>) -> HashMap<String, i8> {
             let mut new_map = map.clone();
             for (k, v) in &self.content {
@@ -344,6 +347,8 @@ pub mod featuretable {
             }
         }
 
+        /// Create a [`FeatureHashes`] struct from a set of bases at `base_path`
+        /// and a set of diacritics at `dia_path`
         pub fn from_base_and_diacritics(base_path: &str, dia_path: &str) -> FeatureHashes {
             let fh = FeatureTable::from_csv(&base_path).to_feature_hashes();
             let dias = FeatureHashes::load_diacritics(&dia_path);
@@ -365,6 +370,7 @@ pub mod featuretable {
             }
         }
 
+        /// Applies diacritics in `dia` to the `FeatureHashes`.
         pub fn apply_diacritics(&self, dias: &Vec<Diacritic>) -> FeatureHashes {
             let mut fh = self.fh.clone();
             let fnames = self.fnames.clone();
