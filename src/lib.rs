@@ -7,6 +7,8 @@ pub mod featuretable {
     use std::fs::File;
     use std::path::Path;
     use std::string::String;
+    use std::str::Chars;
+    use std::iter::FromIterator;
     extern crate cached;
     use cached::proc_macro::cached;
     use cached::UnboundCache;
@@ -14,13 +16,14 @@ pub mod featuretable {
 
     /// The [`FeatureTable`] struct provides a layer of abstraction over `ft`, a
     /// [`HashMap`] defining the relationship between IPA phonemes and their
-    /// featural eqivalents (expressed as vectors of `i8`s). The `fnames` field
+    /// featural equivalents (expressed as vectors of `i8`s). The `fnames` field
     /// provides human-interpretable names for each of the dimensions in the
     /// vectors.
     #[derive(Debug)]
     pub struct FeatureTable {
         pub ft: HashMap<String, Vec<i8>>,
         pub fnames: Vec<String>,
+        pub ph_max_len: usize,
     }
 
     impl FeatureTable {
@@ -29,19 +32,25 @@ pub mod featuretable {
         /// specifications in each of the additional columns (which each column
         /// corresponds to a feature).
         pub fn from_csv(path: &str) -> FeatureTable {
-            FeatureTable {
-                ft: FeatureTable::read_feature_table(path),
-                fnames: FeatureTable::read_feature_names(path),
+            let ft = FeatureTable::read_feature_table(path);
+            let fnames = FeatureTable::read_feature_names(path);
+            let mut ph_max_len = 0;
+            for (ph, _) in ft.clone() {
+                ph_max_len = ph_max_len.max(ph.len())
             }
+            FeatureTable { ft, fnames, ph_max_len }
         }
 
         /// Constructs a new [`FeatureTable`] using the default data file that
         /// is compiled into the binary.
         pub fn new() -> FeatureTable {
-            FeatureTable {
-                ft: FeatureTable::default_feature_table(),
-                fnames: FeatureTable::default_feature_names(),
+            let ft = FeatureTable::default_feature_table();
+            let fnames = FeatureTable::default_feature_names();
+            let mut ph_max_len = 0;
+            for (ph, _) in ft.clone() {
+                ph_max_len = ph_max_len.max(ph.len())
             }
+            FeatureTable { ft, fnames, ph_max_len }
         }
 
         /// Reads a feature table, as a [`HashMap`] from `String`s to `Vec`s,
@@ -150,27 +159,21 @@ pub mod featuretable {
         /// ```
         pub fn phonemes(&self, s: &str) -> Vec<String> {
             let ft = &self.ft;
-            let mut v: Vec<String> = Vec::new();
-            let mut acc: String = String::from("");
-            for c in s.chars() {
-                acc.push(c);
-                if c != '͡' {
-                    match ft.get(&acc) {
-                        Some(_) => {},
-                        None => {
-                            match acc.pop() {
-                                Some(_) => {
-                                    v.push(acc);
-                                    acc = c.to_string();
-                                },
-                                None => {},
-                            }
-                        }
+            let mut chars: Chars = s.chars();
+            let mut s;
+            let mut phonemes: Vec<String> = Vec::new();
+            while chars.clone().next().is_some() {
+                for k in (1..self.ph_max_len).rev() {
+                    let c = chars.clone();
+                    let ph: Vec<char> = c.into_iter().take(k).collect();
+                    if ft.contains_key(&String::from_iter(&ph)) {
+                        phonemes.push(String::from_iter(ph));
+                    s = chars.into_iter().skip(k).collect::<String>();
+                    chars = s.chars();
                     }
                 }
             }
-            v.push(acc);
-            return v;
+            phonemes
         }
 
         /// Takes a vector of phonemes and returns a vector of feature vectors.
@@ -181,9 +184,9 @@ pub mod featuretable {
         /// # use rspanphon::featuretable::*;
         /// let ft = FeatureTable::new();
         /// let phonemes = ft.phonemes("kʰul");
-        /// assert_eq(3, ft.phonemes_to_vectors(phonemes).len());
+        /// assert_eq!(3, ft.phonemes_to_vectors(phonemes).len());
         /// ```
-        pub fn phonemes_to_vectors(&self, ps: &Vec<String>) -> Vec<Vec<i8>> {
+        pub fn phonemes_to_vectors(&self, ps: Vec<String>) -> Vec<Vec<i8>> {
             let mut vs: Vec<Vec<i8>> = Vec::new();
             for p in ps.iter() {
                 match &self.ft.get(p) {
@@ -191,7 +194,7 @@ pub mod featuretable {
                     None => (),
                 }
             }
-            return vs;
+            vs
         }
 
         /// Computes the unweighted feature distance between two vectors. This
@@ -200,7 +203,7 @@ pub mod featuretable {
         /// However, the results from the functions that calculate deletion,
         /// insertion, and substitution cost are memoized so that the best case
         /// run time is close to O(m * n).
-        pub fn fd(s: &Vec<Vec<i8>>, t: &Vec<Vec<i8>>) -> f64 {
+        pub fn fd(s: Vec<Vec<i8>>, t: Vec<Vec<i8>>) -> f64 {
             let n = s.len();
             let m = t.len();
             let k = s[0].len();
@@ -231,11 +234,16 @@ pub mod featuretable {
 
         /// Wraps [`FeatureTable::fd`], accepting `&str`s directly
         /// instead of vectors of feature vectors. 
+        /// ```
+        /// use rspanphon::featuretable::*;
+        /// let ft = FeatureTable::new();
+        /// assert!(ft.feature_edit_distance("tin", "din") < ft.feature_edit_distance("tin", "kin"))
+        /// ```
         pub fn feature_edit_distance(&self, s1: &str, s2: &str) -> f64 {
-            let ps1 = &self.phonemes(s1);
-            let ps2 = &self.phonemes(s2);
-            let v1 = &self.phonemes_to_vectors(ps1);
-            let v2 = &self.phonemes_to_vectors(ps2);
+            let ps1 = self.phonemes(s1);
+            let ps2 = self.phonemes(s2);
+            let v1 = self.phonemes_to_vectors(ps1);
+            let v2 = self.phonemes_to_vectors(ps2);
             FeatureTable::fd(v1, v2)
         }
 
@@ -250,7 +258,7 @@ pub mod featuretable {
                 });
                 fh.fh.insert(k, f);
             }
-            return fh;
+            fh
         }
     }
 
@@ -313,7 +321,7 @@ pub mod featuretable {
                         .all(|x| x)
                 })
                 .all(|x| x);
-            return result;
+            result
         }
 
         pub fn update_seg(
@@ -322,13 +330,13 @@ pub mod featuretable {
         ) -> Option<(String, HashMap<String, i8>)> {
             let (ipa, fts) = seg;
             if !(ipa.contains(&self.marker))
-                && Diacritic::satisfy_conditions(&self.conditions, &fts)
+                && Diacritic::satisfy_conditions(&self.conditions, fts)
             {
-                let ipa = &self.affix(&ipa);
-                let fts = &self.update_ft_map(&fts);
-                return Some((ipa.to_string(), fts.clone()));
+                let ipa = &self.affix(ipa);
+                let fts = &self.update_ft_map(fts);
+                Some((ipa.to_string(), fts.clone()))
             } else {
-                return None;
+                None
             }
         }
     }
@@ -350,8 +358,8 @@ pub mod featuretable {
         /// Create a [`FeatureHashes`] struct from a set of bases at `base_path`
         /// and a set of diacritics at `dia_path`
         pub fn from_base_and_diacritics(base_path: &str, dia_path: &str) -> FeatureHashes {
-            let fh = FeatureTable::from_csv(&base_path).to_feature_hashes();
-            let dias = FeatureHashes::load_diacritics(&dia_path);
+            let fh = FeatureTable::from_csv(base_path).to_feature_hashes();
+            let dias = FeatureHashes::load_diacritics(dia_path);
             fh.apply_diacritics(&dias)
         }
 
@@ -364,10 +372,13 @@ pub mod featuretable {
             self.fh.iter().for_each(|(k, v)| {
                 let _ = ft.insert(k.to_string(), self.map_to_vec(v));
             });
-            FeatureTable {
-                ft: ft,
-                fnames: self.fnames.clone(),
+            let fnames = self.fnames.clone();
+            let mut ph_max_len = 0;
+            for (ph, _) in ft.clone() {
+                ph_max_len = ph_max_len.max(ph.len())
             }
+            FeatureTable {
+                ft, fnames, ph_max_len}
         }
 
         /// Applies diacritics in `dia` to the `FeatureHashes`.
@@ -389,10 +400,7 @@ pub mod featuretable {
                 fh.extend(fh_acc);
                 println!("Pass {:?} -- {:?} segments.", i, fh.len());
             }
-            FeatureHashes {
-                fh: fh,
-                fnames: fnames,
-            }
+            FeatureHashes { fh, fnames }
         }
 
         fn load_diacritics(path: &str) -> Vec<Diacritic> {
@@ -401,7 +409,7 @@ pub mod featuretable {
                 Err(e) => panic!("Error opening {:?}: {:?}", path, e),
             };
             match serde_yaml::from_str::<DiacriticDefs>(&s) {
-                Ok(defs) => return defs.diacritics,
+                Ok(defs) => defs.diacritics,
                 Err(e) => panic!("Error parsing {:?}: {:?}", path, e),
             }
         }
@@ -416,7 +424,7 @@ pub mod featuretable {
                     return false;
                 }
             }
-            return true;
+            true
         }
     }
 
@@ -445,10 +453,10 @@ pub mod featuretable {
         let d: f64 = v1
             .iter()
             .zip(v2.iter())
-            .map(|(x, y)| _feature_diff_ternary(&x, &y))
+            .map(|(x, y)| _feature_diff_ternary(x, y))
             .sum::<f64>()
             / (v1.len() as f64);
-        return d;
+        d
     }
 
     fn to_numeric(f: &str) -> i8 {
@@ -460,17 +468,17 @@ pub mod featuretable {
     }
 
     fn _feature_diff_ternary(f1: &i8, f2: &i8) -> f64 {
-        let d = match (f1, f2) {
+        match (f1, f2) {
             (-1, 1) => 1.0,
             (1, -1) => 1.0,
             _ => 0.0,
-        };
-        return d;
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
+
     use crate::featuretable::*;
     #[test]
     fn ligature_ties() {
