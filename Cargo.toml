@@ -8,7 +8,6 @@ description="rsPanPhon, a rough Rust port of the Python PanPhon library, extract
 readme="README.md"
 repository="https://github.com/dmort27/rspanphon"
 license="MIT"
-license-file="LICENSE"
 keywords=["NLP", "linguistics", "phonology", "phoneme", "articulatory"]
 
 [lib]
