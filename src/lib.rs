@@ -5,14 +5,13 @@ pub mod featuretable {
     use serde_yaml;
     use std::collections::HashMap;
     use std::fs::File;
-    use std::path::Path;
-    use std::string::String;
-    use std::str::Chars;
     use std::iter::FromIterator;
+    use std::path::Path;
+    use std::str::Chars;
+    use std::string::String;
     extern crate cached;
     use cached::proc_macro::cached;
     use cached::UnboundCache;
-
 
     /// The [`FeatureTable`] struct provides a layer of abstraction over `ft`, a
     /// [`HashMap`] defining the relationship between IPA phonemes and their
@@ -38,7 +37,11 @@ pub mod featuretable {
             for (ph, _) in ft.clone() {
                 ph_max_len = ph_max_len.max(ph.len())
             }
-            FeatureTable { ft, fnames, ph_max_len }
+            FeatureTable {
+                ft,
+                fnames,
+                ph_max_len,
+            }
         }
 
         /// Constructs a new [`FeatureTable`] using the default data file that
@@ -50,7 +53,11 @@ pub mod featuretable {
             for (ph, _) in ft.clone() {
                 ph_max_len = ph_max_len.max(ph.len())
             }
-            FeatureTable { ft, fnames, ph_max_len }
+            FeatureTable {
+                ft,
+                fnames,
+                ph_max_len,
+            }
         }
 
         /// Reads a feature table, as a [`HashMap`] from `String`s to `Vec`s,
@@ -76,11 +83,11 @@ pub mod featuretable {
                 }
                 table.insert(k, tail);
             }
-            return table;
+            table
         }
 
         /// Reads the names of the features from a CSV file. It is assumed that
-        /// they are in the header row in the non-initial columns. 
+        /// they are in the header row in the non-initial columns.
         fn read_feature_names(path: &str) -> Vec<String> {
             let path = Path::new(path);
             let display = path.display();
@@ -117,7 +124,7 @@ pub mod featuretable {
                 }
                 table.insert(k, tail);
             }
-            return table;
+            table
         }
 
         /// Reads the feature names from the default file `ipa_all.csv`.
@@ -139,19 +146,19 @@ pub mod featuretable {
                 let name = header[i].to_string();
                 fnames.push(name);
             }
-            return fnames;
+            fnames
         }
 
         /// Returns the feature names associated with a [`FeatureTable`] object.
         pub fn to_fnames(&self) -> Vec<String> {
-            return self.fnames.clone();
+            self.fnames.clone()
         }
 
         /// Parses an IPA `&str` into individual phonemes, based on the feature
         /// table.
-        /// 
+        ///
         /// # Example
-        /// 
+        ///
         /// ```rust
         /// # use rspanphon::featuretable::*;
         /// let ft = FeatureTable::new();
@@ -162,24 +169,26 @@ pub mod featuretable {
             let mut chars: Chars = s.chars();
             let mut s;
             let mut phonemes: Vec<String> = Vec::new();
-            while chars.clone().next().is_some() {
+            'top: while chars.clone().next().is_some() {
                 for k in (1..self.ph_max_len).rev() {
                     let c = chars.clone();
                     let ph: Vec<char> = c.into_iter().take(k).collect();
                     if ft.contains_key(&String::from_iter(&ph)) {
                         phonemes.push(String::from_iter(ph));
-                    s = chars.into_iter().skip(k).collect::<String>();
-                    chars = s.chars();
+                        s = chars.into_iter().skip(k).collect::<String>();
+                        chars = s.chars();
+                        continue 'top;
                     }
                 }
+                chars.next();
             }
             phonemes
         }
 
         /// Takes a vector of phonemes and returns a vector of feature vectors.
-        /// 
+        ///
         /// # Example
-        /// 
+        ///
         /// ```rust
         /// # use rspanphon::featuretable::*;
         /// let ft = FeatureTable::new();
@@ -211,7 +220,7 @@ pub mod featuretable {
             let mut t2: Vec<Vec<i8>> = vec![vec![0; k]];
             s2.extend(s.clone());
             t2.extend(t.clone());
-            let mut dp = std::iter::repeat(vec![0.0 as f64; m + 1])
+            let mut dp = std::iter::repeat(vec![0.0; m + 1])
                 .take(n + 1)
                 .collect::<Vec<Vec<f64>>>();
             for i in 1..=n {
@@ -224,8 +233,7 @@ pub mod featuretable {
                 for j in 1..=m {
                     let del = dp[i - 1][j] + unweighted_deletion_cost(&s2[i]);
                     let ins = dp[i][j - 1] + unweighted_insertion_cost(&t2[j]);
-                    let sub = dp[i - 1][j - 1]
-                        + unweighted_substitution_cost2(&s2[i], &t2[j]);
+                    let sub = dp[i - 1][j - 1] + unweighted_substitution_cost2(&s2[i], &t2[j]);
                     dp[i][j] = sub.min(ins.min(del));
                 }
             }
@@ -233,7 +241,7 @@ pub mod featuretable {
         }
 
         /// Wraps [`FeatureTable::fd`], accepting `&str`s directly
-        /// instead of vectors of feature vectors. 
+        /// instead of vectors of feature vectors.
         /// ```
         /// use rspanphon::featuretable::*;
         /// let ft = FeatureTable::new();
@@ -329,8 +337,7 @@ pub mod featuretable {
             seg: &(String, HashMap<String, i8>),
         ) -> Option<(String, HashMap<String, i8>)> {
             let (ipa, fts) = seg;
-            if !(ipa.contains(&self.marker))
-                && Diacritic::satisfy_conditions(&self.conditions, fts)
+            if !(ipa.contains(&self.marker)) && Diacritic::satisfy_conditions(&self.conditions, fts)
             {
                 let ipa = &self.affix(ipa);
                 let fts = &self.update_ft_map(fts);
@@ -378,7 +385,10 @@ pub mod featuretable {
                 ph_max_len = ph_max_len.max(ph.len())
             }
             FeatureTable {
-                ft, fnames, ph_max_len}
+                ft,
+                fnames,
+                ph_max_len,
+            }
         }
 
         /// Applies diacritics in `dia` to the `FeatureHashes`.
@@ -428,17 +438,26 @@ pub mod featuretable {
         }
     }
 
-    #[cached(type="UnboundCache<(Vec<i8>), f64>", create = "{ UnboundCache::new() }")]
+    #[cached(
+        type = "UnboundCache<(Vec<i8>), f64>",
+        create = "{ UnboundCache::new() }"
+    )]
     fn unweighted_deletion_cost(v1: &Vec<i8>) -> f64 {
         return v1.iter().map(|&x| x.abs()).sum::<i8>() as f64 / (v1.len() as f64);
     }
 
-    #[cached(type="UnboundCache<(Vec<i8>), f64>", create = "{ UnboundCache::new() }")]
+    #[cached(
+        type = "UnboundCache<(Vec<i8>), f64>",
+        create = "{ UnboundCache::new() }"
+    )]
     fn unweighted_insertion_cost(v1: &Vec<i8>) -> f64 {
         return v1.iter().map(|&x| x.abs()).sum::<i8>() as f64 / (v1.len() as f64);
     }
 
-    #[cached(type="UnboundCache<(Vec<i8>, Vec<i8>), f64>", create = "{ UnboundCache::new() }")]
+    #[cached(
+        type = "UnboundCache<(Vec<i8>, Vec<i8>), f64>",
+        create = "{ UnboundCache::new() }"
+    )]
     fn unweighted_substitution_cost2(v1: &Vec<i8>, v2: &Vec<i8>) -> f64 {
         return v1
             .iter()
@@ -448,7 +467,10 @@ pub mod featuretable {
             / (v1.len() as f64);
     }
 
-    #[cached(type="UnboundCache<(Vec<i8>, Vec<i8>), f64>", create = "{ UnboundCache::new() }")]
+    #[cached(
+        type = "UnboundCache<(Vec<i8>, Vec<i8>), f64>",
+        create = "{ UnboundCache::new() }"
+    )]
     fn _unweighted_substitution_cost(v1: &Vec<i8>, v2: &Vec<i8>) -> f64 {
         let d: f64 = v1
             .iter()
@@ -484,5 +506,14 @@ mod tests {
     fn ligature_ties() {
         let ft = FeatureTable::new();
         assert_eq!(vec!["t͡s".to_string(), "a".to_string()], ft.phonemes("t͡sa"));
+    }
+
+    #[test]
+    fn non_ipa() {
+        let ft = FeatureTable::new();
+        assert_eq!(
+            vec!["k".to_string(), "ə".to_string(), "a".to_string()],
+            ft.phonemes("kə-a")
+        );
     }
 }
