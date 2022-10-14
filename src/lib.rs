@@ -212,6 +212,11 @@ pub mod featuretable {
         /// However, the results from the functions that calculate deletion,
         /// insertion, and substitution cost are memoized so that the best case
         /// run time is close to O(m * n).
+        /// ```
+        /// use rspanphon::featuretable::*;
+        /// assert_eq!(FeatureTable::fd(vec![vec![1, 0, 0]], vec![vec![0, 1, 0]]), 
+        ///            FeatureTable::fd(vec![vec![0, 1, 0]], vec![vec![0, 0, 1]]))
+        /// ```
         pub fn fd(s: Vec<Vec<i8>>, t: Vec<Vec<i8>>) -> f64 {
             let n = s.len();
             let m = t.len();
